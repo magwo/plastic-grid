@@ -2,7 +2,7 @@
 
 <head>
   <meta charset="UTF-8"> 
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1.0, user-scalable=no">
   <style>
     html {
         margin: 0;
@@ -11,6 +11,9 @@
         width: 100vw;
         height: 100vh;
         margin: 0 auto;
+    }
+    body * {
+        user-select: none;
     }
     body {
       display: flex;
@@ -169,20 +172,24 @@
         }
 
         document.getElementsByTagName("body")[0].addEventListener("mousemove", function(event) {
+            event.preventDefault();
             handleMouseTouching(event.clientX - surface.offsetLeft, event.clientY - surface.offsetTop);
-        });
+        }, { passive: false });
 
         document.getElementsByTagName("body")[0].addEventListener("touchmove", function(event) {
+            event.preventDefault();
             hasSeenTouch = true;
             handleTouch(event.touches);
-        });
+        }, { passive: false });
 
         document.getElementsByTagName("body")[0].addEventListener("touchstart", function(event) {
+            event.preventDefault();
             hasSeenTouch = true;
             handleTouch(event.touches);
-        });
+        }, { passive: false });
 
         document.getElementsByTagName("body")[0].addEventListener("touchend", function(event) {
+            event.preventDefault();
             hasSeenTouch = true;
             // Hmmm
             for(ct of event.changedTouches) {
@@ -192,7 +199,7 @@
                     }
                 }
             }
-        });
+        }, { passive: false });
 
         createSimulation();
         updateVisuals();
