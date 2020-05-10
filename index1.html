@@ -45,15 +45,14 @@
     <script>
         // const surfaceSize = 600;
         const surface = document.getElementById("surface");
-        const nominalBlobWidth = 10;
-        const nominalBlobHeight = 10;
+        const nominalBlobWidth = 12;
+        const nominalBlobHeight = 12;
         const countX = surface.clientWidth / nominalBlobWidth;
         const countY = surface.clientHeight / nominalBlobHeight;
         const blobs = [];
         const domBlobs = [];
-        let touches = [];
-
-        let hasSeenTouch = false;
+        let mouseX = -100;
+        let mouseY = -100;
 
         function createBlobObject(x, y) {
             return {
@@ -61,7 +60,7 @@
                 homeY: y,
                 x: x,
                 y: y,
-                size: 0.4,
+                size: 0.5,
                 disruption: 0.0,
                 forceUpdate: true,
             }
@@ -71,42 +70,34 @@
             return Math.sqrt(x * x + y * y);
         }
 
-    function updateSimulation(deltaTime) {
-
+        function updateSimulation(deltaTime) {
             for(var i=0; i<blobs.length; i++) {
                 const b = blobs[i];
-                const left = b.x - nominalBlobWidth * 4;
-                const right = b.x + nominalBlobWidth * 4;
-                const top = b.y - nominalBlobHeight * 4;
-                const bottom = b.y + nominalBlobHeight * 4;
 
-                for(var t=0; t<touches.length;t++) {
-                    const mouseX = touches[t].x;
-                    const mouseY = touches[t].y;
-                    const touchRadius = touches[t].radius;
+                const left = b.x - nominalBlobWidth * 3;
+                const right = b.x + nominalBlobWidth * 3;
+                const top = b.y - nominalBlobHeight * 3;
+                const bottom = b.y + nominalBlobHeight * 3;
                 
-                
-                    if(mouseX > left && mouseX < right && mouseY > top && mouseY < bottom) {
-                        centerX = b.x + nominalBlobWidth * 0.5;
-                        centerY = b.y + nominalBlobHeight * 0.5;
+                if(mouseX > left && mouseX < right && mouseY > top && mouseY < bottom) {
+                    centerX = b.x + nominalBlobWidth * 0.5;
+                    centerY = b.y + nominalBlobHeight * 0.5;
 
-                        let normMouseToCenterX = (centerX - mouseX);
-                        let normMouseToCenterY = (centerY - mouseY);
-                        const length = getVectorLength(normMouseToCenterX, normMouseToCenterY);
-                        normMouseToCenterX /= length;
-                        normMouseToCenterY /= length;
+                    let normMouseToCenterX = (centerX - mouseX);
+                    let normMouseToCenterY = (centerY - mouseY);
+                    const length = getVectorLength(normMouseToCenterX, normMouseToCenterY);
+                    normMouseToCenterX /= length;
+                    normMouseToCenterY /= length;
 
-                        const pushDistance = Math.max(0.0, touchRadius - length);
+                    const pushDistance = Math.max(0.0, nominalBlobWidth * 3 - length);
 
-                        if(pushDistance > 0.0) {
-                            b.x = b.x + (normMouseToCenterX * pushDistance);
-                            b.y = b.y + (normMouseToCenterY * pushDistance);
-                            b.disruption = 4.0;
-                            b.size = Math.max(0.2, b.size - pushDistance * 0.005);
-                        }
+                    if(pushDistance > 0.0) {
+                        b.x = b.x + (normMouseToCenterX * pushDistance);
+                        b.y = b.y + (normMouseToCenterY * pushDistance);
+                        b.disruption = 4.0;
+                        b.size = Math.max(0.2, b.size - pushDistance * 0.005);
                     }
-                }
-                if(b.disruption > 0.0 && b.disruption < 1.0) {
+                } else if(b.disruption > 0.0 && b.disruption < 1.0) {
                     b.x = (b.x * b.disruption + b.homeX * (1.0 - b.disruption));
                     b.y = (b.y * b.disruption + b.homeY * (1.0 - b.disruption));
                     
@@ -126,7 +117,6 @@
                 if(b.disruption > 0.0 || b.forceUpdate) {
                     const domBlob = domBlobs[i];
                     domBlob.style.transform = `translate3d(${b.x}px, ${b.y}px, 0.0) scale(${b.size}, ${b.size})`;
-                    domBlob.style.opacity = `${b.size * 1.5}`;
                     b.forceUpdate = false;
                 }
             }
@@ -149,49 +139,24 @@
             }
         }
 
-
-        function handleMouseTouching(mouseX, mouseY) {
-            if(!hasSeenTouch) {
-                touches = [{ x: mouseX, y: mouseY, radius: 20.0 }];
-            }
-        }
-
-        function handleTouch(touchTouches) {
-            touches.length = 0;
-            for (t of touchTouches) {
-                touches.push({
-                    id: t.id,
-                    x: t.clientX - surface.offsetLeft,
-                    y: t.clientY - surface.offsetTop,
-                    radius: (t.force ? 5 + t.force * 20 : 15.0)
-                });
-            }
-        }
-
         document.getElementsByTagName("body")[0].addEventListener("mousemove", function(event) {
-            handleMouseTouching(event.clientX - surface.offsetLeft, event.clientY - surface.offsetTop);
+            mouseX = event.clientX - surface.offsetLeft;
+            mouseY = event.clientY - surface.offsetTop;
         });
 
         document.getElementsByTagName("body")[0].addEventListener("touchmove", function(event) {
-            hasSeenTouch = true;
-            handleTouch(event.touches);
+            mouseX = event.touches[0].clientX - surface.offsetLeft;
+            mouseY = event.touches[0].clientY - surface.offsetTop;
         });
 
         document.getElementsByTagName("body")[0].addEventListener("touchstart", function(event) {
-            hasSeenTouch = true;
-            handleTouch(event.touches);
+            mouseX = event.touches[0].clientX - surface.offsetLeft;
+            mouseY = event.touches[0].clientY - surface.offsetTop;
         });
 
         document.getElementsByTagName("body")[0].addEventListener("touchend", function(event) {
-            hasSeenTouch = true;
-            // Hmmm
-            for(ct of event.changedTouches) {
-                for(let ti=0; ti<touches.length; ti++) {
-                    if(ct.id === touches[ti].id) {
-                        touches.splice(ti, 1);
-                    }
-                }
-            }
+            mouseX = -100;
+            mouseY = -100;
         });
 
         createSimulation();
