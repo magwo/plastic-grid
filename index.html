@@ -5,15 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1.0, user-scalable=no">
   <style>
     html {
-        touch-action: manipulation;
         margin: 0;
         padding: 0;
         overflow: hidden;
         width: 100vw;
         height: 100vh;
     }
-    body * {
+    html *, body * {
         user-select: none;
+        touch-action: none;
     }
     body {
       display: flex;
@@ -183,6 +183,7 @@
         }, { passive: false });
 
         document.getElementsByTagName("body")[0].addEventListener("touchstart", function(event) {
+            console.log("Touch start");
             event.preventDefault();
             hasSeenTouch = true;
             handleTouch(event.touches);
