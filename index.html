@@ -35,40 +35,45 @@
         z-index: 50;
     }
 
-    .blob {
-        position: absolute;
+    canvas {
+        display: block;
+        position: relative;
         top: 0;
         left: 0;
-        z-index: 100;
+        right: 0;
+        bottom: 0;
     }
   </style>
 </head>
 
 <body>
-    <div id="surface"></div>
+    <div id="surface">
+        <canvas width="400"></canvas>
+    </div>
 
     <script>
         // const surfaceSize = 600;
         const surface = document.getElementById("surface");
+        const canvas = surface.getElementsByTagName("canvas")[0];
         const nominalBlobWidth = 10;
         const nominalBlobHeight = 10;
         const countX = surface.clientWidth / nominalBlobWidth;
         const countY = surface.clientHeight / nominalBlobHeight;
         const blobs = [];
-        const domBlobs = [];
         let touches = [];
+        let oldTouches = [];
 
         let hasSeenTouch = false;
 
-        function createBlobObject(x, y) {
+        function createBlobObject(x, y, color) {
             return {
                 homeX: x,
                 homeY: y,
                 x: x,
                 y: y,
                 size: 0.4,
+                color: color,
                 disruption: 0.0,
-                forceUpdate: true,
             }
         }
 
@@ -83,7 +88,7 @@
             return [x0 + (x1 - x0) * factor, y0 + (y1 - y0) * factor];
         }
 
-        function updateSimulation(deltaTime) {
+        function updateSimulation(deltaTime, touches, oldTouches) {
 
             for(var i=0; i<blobs.length; i++) {
                 const b = blobs[i];
@@ -94,16 +99,16 @@
 
                 let mouseX, mouseY;
 
-                for(var t=0; t<touches.length;t++) {
-                    const touch = touches[t];
+                for(let ti=0; ti < touches.length; ti++) {
+                    const touch = touches[ti];
                     const touchRadius = touch.radius;
+                    const oldTouch = oldTouches[ti] || touch;
+                    const travelledLength = getVectorLength(touch.x - oldTouch.x, touch.y - oldTouch.y);
+                    const requiredUpdates = (travelledLength > 0.0001 ?  Math.ceil(travelledLength / touchRadius) : 1);
 
-                    const travelledLength = getVectorLength(touch.x - touch.previousX, touch.y - touch.previousY);
-                    let location = 0.0;
-                    while(true) {
-                        const factor = Math.min(travelledLength, location) / travelledLength;
-
-                        [mouseX, mouseY] = interpolate(touch.previousX, touch.previousY, touch.x, touch.y, factor, true);
+                    for(let updateIndex=1; updateIndex<=requiredUpdates; updateIndex++) {
+                        const factor = updateIndex / requiredUpdates;
+                        [mouseX, mouseY] = interpolate(oldTouch.x, oldTouch.y, touch.x, touch.y, factor, true);
 
                         if(mouseX > left && mouseX < right && mouseY > top && mouseY < bottom) {
                             centerX = b.x + nominalBlobWidth * 0.5;
@@ -124,17 +129,12 @@
                                 b.size = Math.max(0.2, b.size - pushDistance * 0.005);
                             }
                         }
-                        if(location > travelledLength) {
-                            break;
-                        }
-                        location += touchRadius * 1.0;
                     }
                 }
                 if(b.disruption > 0.0 && b.disruption < 1.0) {
                     b.x = (b.x * b.disruption + b.homeX * (1.0 - b.disruption));
                     b.y = (b.y * b.disruption + b.homeY * (1.0 - b.disruption));
                     
-                    // console.log("Setting size", b.disruption);
                     b.size = Math.min(1.0, Math.max(0.2, b.size + deltaTime * 0.2));
                     b.disruption -= deltaTime;
                 } else {
@@ -144,16 +144,17 @@
         }
 
         function updateVisuals() {
+            const ctx = canvas.getContext('2d');
+            ctx.save();
+            ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+
             for(var i=0; i<blobs.length; i++) {
                 const b = blobs[i];
-                
-                if(b.disruption > 0.0 || b.forceUpdate) {
-                    const domBlob = domBlobs[i];
-                    domBlob.style.transform = `translate3d(${b.x}px, ${b.y}px, 0.0) scale(${b.size}, ${b.size})`;
-                    domBlob.style.opacity = `${b.size * 1.5}`;
-                    b.forceUpdate = false;
-                }
+                // domBlob.style.opacity = `${b.size * 1.5}`;
+                ctx.fillStyle = b.color;
+                ctx.fillRect(b.x, b.y, nominalBlobWidth * b.size, nominalBlobHeight * b.size);
             }
+            ctx.restore();
         }
 
         function createSimulation() {
@@ -161,30 +162,32 @@
                 for(let x=0; x<countX; x++) {
                     const xPos = x * nominalBlobWidth;
                     const yPos = y * nominalBlobHeight;
-                    blobs.push(createBlobObject(xPos, yPos));
-                    const domBlob = document.createElement("div");
-                    domBlob.classList = ["blob"];
-                    domBlob.style.width = `${nominalBlobWidth}px`
-                    domBlob.style.height = `${nominalBlobHeight}px`
-                    domBlob.style["background-color"] = `rgb(${100+250*x/countX}, 0, ${100+250*y/countY})`;
-                    surface.appendChild(domBlob);
-                    domBlobs.push(domBlob);
+                    const color = `rgb(${100+250*x/countX}, 0, ${100+250*y/countY})`;
+                    blobs.push(createBlobObject(xPos, yPos, color));
                 }
             }
         }
 
+        function resizeCanvas() {
+            canvas.width = surface.clientWidth;
+            canvas.height = surface.clientHeight;
+        }
+
+        function createVisuals() {
+            resizeCanvas();
+        }
+
 
         function handleMouseTouching(mouseX, mouseY) {
-            let previousX = touches[0] ? touches[0].x : mouseX;
-            let previousY = touches[0] ? touches[0].y : mouseY;
-            touches = [{ x: mouseX, y: mouseY, previousX, previousY, radius: 20.0 }];
+            touches = [];
+            touches.push({ id: 0, x: mouseX, y: mouseY, radius: 20.0 });
         }
 
         function handleTouch(touchTouches) {
-            touches.length = 0;
+            touches = [];
             for (t of touchTouches) {
                 touches.push({
-                    id: t.id,
+                    id: t.identifier,
                     x: t.clientX - surface.offsetLeft,
                     y: t.clientY - surface.offsetTop,
                     radius: (t.force ? 10 + t.force * 15 : 15.0)
@@ -192,54 +195,47 @@
             }
         }
 
-        newestMouseMoveEvent = null;
         document.getElementsByTagName("body")[0].addEventListener("mousemove", function(event) {
+            handleMouseTouching(event.clientX - surface.offsetLeft, event.clientY - surface.offsetTop);
             event.preventDefault();
-            newestMouseMoveEvent = event;
         }, { passive: false });
 
-        function updateMouseEvents() {
-            if(newestMouseMoveEvent && !hasSeenTouch) {
-                handleMouseTouching(newestMouseMoveEvent.clientX - surface.offsetLeft, newestMouseMoveEvent.clientY - surface.offsetTop);
-            }
-        }
-
         document.getElementsByTagName("body")[0].addEventListener("touchmove", function(event) {
-            event.preventDefault();
             hasSeenTouch = true;
+            event.preventDefault();
             handleTouch(event.touches);
         }, { passive: false });
 
         document.getElementsByTagName("body")[0].addEventListener("touchstart", function(event) {
-            console.log("Touch start");
-            event.preventDefault();
             hasSeenTouch = true;
+            event.preventDefault();
             handleTouch(event.touches);
         }, { passive: false });
 
         document.getElementsByTagName("body")[0].addEventListener("touchend", function(event) {
             event.preventDefault();
             hasSeenTouch = true;
-            // Hmmm
             for(ct of event.changedTouches) {
-                for(let ti=0; ti<touches.length; ti++) {
-                    if(ct.id === touches[ti].id) {
-                        touches.splice(ti, 1);
+                for(let i=0; i<touches.length; i++) {
+                    if(ct.identifier === touches[i].id) {
+                        touches.splice(i, 1);
                     }
                 }
             }
         }, { passive: false });
 
-        createSimulation();
-        updateVisuals();
 
         let lastTimestamp = null;
         function update(timeStamp) {
+            if(lastTimestamp === null) {
+                createSimulation();
+                createVisuals();
+            }
             const deltaTime = (lastTimestamp ? timeStamp - lastTimestamp : 16);
-            updateMouseEvents();
-            updateSimulation(deltaTime * 0.001);
+            updateSimulation(deltaTime * 0.001, touches, oldTouches);
             updateVisuals();
             lastTimestamp = timeStamp;
+            oldTouches = touches;
             requestAnimationFrame(update);
         }
         requestAnimationFrame(update);
